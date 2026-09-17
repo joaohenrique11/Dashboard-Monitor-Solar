@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Monitor Solar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0B1420;
+    --bg-panel: #121E2F;
+    --text: #EDEAE2;
+    --text-muted: #8D9AAE;
+    --gold: #E8A33D;
+    --teal: #57C4A0;
+    --hairline: rgba(237, 234, 226, 0.12);
+    --red: #E0684F;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 48px 24px 96px;
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 40px;
+  }
+
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 28px;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  .status {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .status .dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    margin-right: 6px;
+    position: relative;
+    top: -1px;
+  }
+  .status.live .dot { background: var(--teal); }
+  .status.error .dot { background: var(--red); }
+
+  /* --- Config panel --- */
+  .config {
+    background: var(--bg-panel);
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin-bottom: 48px;
+  }
+  .config summary {
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-muted);
+    list-style: none;
+  }
+  .config summary::-webkit-details-marker { display: none; }
+  .config summary:before {
+    content: "⚙ ";
+  }
+  .config[open] summary { margin-bottom: 16px; }
+  .config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 560px) { .config-grid { grid-template-columns: 1fr; } }
+  .field label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .field input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--hairline);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+  }
+  .field input:focus { outline: 1px solid var(--gold); border-color: var(--gold); }
+  .config button {
+    margin-top: 16px;
+    background: var(--gold);
+    color: #1a1206;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 18px;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .config .hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 10px;
+    line-height: 1.5;
+  }
+
+  /* --- Hero: sun arc gauge --- */
+  .hero {
+    display: flex;
+    align-items: center;
+    gap: 40px;
+    padding-bottom: 40px;
+    margin-bottom: 40px;
+    border-bottom: 1px solid var(--hairline);
+    flex-wrap: wrap;
+  }
+  .gauge-box { position: relative; width: 220px; height: 130px; flex-shrink: 0; }
+  .gauge-box svg { width: 100%; height: 100%; }
+  .gauge-reading {
+    position: absolute;
+    bottom: 6px;
+    left: 0; right: 0;
+    text-align: center;
+  }
+  .gauge-reading .num {
+    font-family: 'Fraunces', serif;
+    font-size: 34px;
+    font-weight: 500;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .gauge-reading .unit {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .hero-copy { flex: 1; min-width: 220px; }
+  .hero-copy .label {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+  }
+  .hero-copy .updated {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* --- Metric row --- */
+  .metrics {
+    display: flex;
+    gap: 0;
+    margin-bottom: 56px;
+    flex-wrap: wrap;
+  }
+  .metric {
+    flex: 1;
+    min-width: 140px;
+    padding: 0 24px;
+    border-left: 1px solid var(--hairline);
+  }
+  .metric:first-child { padding-left: 0; border-left: none; }
+  .metric .label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+  .metric .value {
+    font-family: 'Fraunces', serif;
+    font-size: 26px;
+    font-weight: 500;
+  }
+  .metric .value.teal { color: var(--teal); }
+  .metric .value small { font-size: 14px; color: var(--text-muted); font-family: 'Inter', sans-serif; margin-left: 4px; }
+
+  /* --- Charts --- */
+  .chart-section { margin-bottom: 48px; }
+  .chart-section h2 {
+    font-family: 'Fraunces', serif;
+    font-weight: 500;
+    font-size: 17px;
+    margin: 0 0 20px;
+  }
+  .chart-box {
+    background: var(--bg-panel);
+    border: 1px solid var(--hairline);
+    border-radius: 10px;
+    padding: 20px;
+    height: 260px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--text-muted);
+  }
+  .empty-state .big { font-family: 'Fraunces', serif; font-size: 20px; color: var(--text); margin-bottom: 8px; }
+
+  footer {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 40px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Monitor Solar</h1>
+    <div class="status" id="statusIndicator"><span class="dot"></span><span id="statusText">Não configurado</span></div>
+  </header>
+
+  <details class="config" id="configPanel">
+    <summary>Configurar canal do ThingSpeak</summary>
+    <div class="config-grid">
+      <div class="field">
+        <label for="channelId">Channel ID</label>
+        <input id="channelId" type="text" placeholder="1234567" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label for="readKey">Read API Key (deixe em branco se o canal for público)</label>
+        <input id="readKey" type="text" placeholder="opcional">
+      </div>
+      <div class="field">
+        <label for="maxWatts">Potência máxima do painel (W) — só pra escala do medidor</label>
+        <input id="maxWatts" type="number" value="10" min="1">
+      </div>
+    </div>
+    <button id="saveConfig">Salvar e conectar</button>
+    <p class="hint">Os dados ficam salvos neste navegador. O Channel ID e a Read API Key você encontra na aba "API Keys" do seu canal em thingspeak.com.</p>
+  </details>
+
+  <div id="content">
+    <div class="empty-state">
+      <div class="big">Nenhum canal configurado ainda</div>
+      <div>Abra "Configurar canal do ThingSpeak" acima e informe o Channel ID do seu monitor solar.</div>
+    </div>
+  </div>
+
+  <footer>Atualiza automaticamente a cada 20 segundos, no mesmo ritmo do firmware do ESP32.</footer>
+</div>
+
+<template id="dashboardTemplate">
+  <div class="hero">
+    <div class="gauge-box">
+      <svg viewBox="0 0 220 130">
+        <defs>
+          <linearGradient id="arcGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#57C4A0"/>
+            <stop offset="100%" stop-color="#E8A33D"/>
+          </linearGradient>
+        </defs>
+        <path d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="rgba(237,234,226,0.10)" stroke-width="14" stroke-linecap="round"/>
+        <path id="gaugeArc" d="M 20 110 A 90 90 0 0 1 200 110" fill="none" stroke="url(#arcGradient)" stroke-width="14" stroke-linecap="round"
+              stroke-dasharray="282.6" stroke-dashoffset="282.6"/>
+      </svg>
+      <div class="gauge-reading">
+        <div class="num" id="powerNow">0</div>
+        <div class="unit">watts agora</div>
+      </div>
+    </div>
+    <div class="hero-copy">
+      <div class="label">Produção instantânea do painel</div>
+      <div class="updated">Última leitura: <span id="lastUpdated">—</span></div>
+    </div>
+  </div>
+
+  <div class="metrics">
+    <div class="metric">
+      <div class="label">Tensão</div>
+      <div class="value"><span id="voltageNow">—</span><small>V</small></div>
+    </div>
+    <div class="metric">
+      <div class="label">Corrente</div>
+      <div class="value"><span id="currentNow">—</span><small>mA</small></div>
+    </div>
+    <div class="metric">
+      <div class="label">Energia acumulada</div>
+      <div class="value teal"><span id="energyNow">—</span><small>Wh</small></div>
+    </div>
+  </div>
+
+  <div class="chart-section">
+    <h2>Tensão e corrente ao longo do tempo</h2>
+    <div class="chart-box"><canvas id="vcChart"></canvas></div>
+  </div>
+
+  <div class="chart-section">
+    <h2>Potência gerada</h2>
+    <div class="chart-box"><canvas id="powerChart"></canvas></div>
+  </div>
+
+  <div class="chart-section">
+    <h2>Energia acumulada</h2>
+    <div class="chart-box"><canvas id="energyChart"></canvas></div>
+  </div>
+</template>
+
+<script>
+const STORAGE_KEY = 'ts-config';
+let vcChart, powerChart, energyChart;
+let pollTimer = null;
+
+const els = {
+  statusIndicator: document.getElementById('statusIndicator'),
+  statusText: document.getElementById('statusText'),
+  content: document.getElementById('content'),
+  configPanel: document.getElementById('configPanel'),
+  channelId: document.getElementById('channelId'),
+  readKey: document.getElementById('readKey'),
+  maxWatts: document.getElementById('maxWatts'),
+};
+
+function setStatus(state, text) {
+  els.statusIndicator.className = 'status ' + state;
+  els.statusText.textContent = text;
+}
+
+async function loadConfig() {
+  try {
+    const res = await window.storage.get(STORAGE_KEY, false);
+    if (res && res.value) return JSON.parse(res.value);
+  } catch (e) { /* nada salvo ainda */ }
+  return null;
+}
+
+async function saveConfig(cfg) {
+  try {
+    await window.storage.set(STORAGE_KEY, JSON.stringify(cfg), false);
+  } catch (e) {
+    console.error('Falha ao salvar configuração', e);
+  }
+}
+
+function buildDashboardDOM() {
+  const tpl = document.getElementById('dashboardTemplate');
+  els.content.innerHTML = '';
+  els.content.appendChild(tpl.content.cloneNode(true));
+}
+
+function initCharts() {
+  const commonOpts = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    plugins: { legend: { labels: { color: '#8D9AAE', font: { family: 'Inter', size: 11 } } } },
+    scales: {
+      x: { ticks: { color: '#8D9AAE', maxTicksLimit: 6 }, grid: { color: 'rgba(237,234,226,0.06)' } },
+      y: { ticks: { color: '#8D9AAE' }, grid: { color: 'rgba(237,234,226,0.06)' } }
+    }
+  };
+
+  vcChart = new Chart(document.getElementById('vcChart'), {
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label: 'Tensão (V)', data: [], borderColor: '#E8A33D', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0, yAxisID: 'y' },
+      { label: 'Corrente (mA)', data: [], borderColor: '#57C4A0', backgroundColor: 'transparent', tension: 0.3, pointRadius: 0, yAxisID: 'y1' }
+    ]},
+    options: { ...commonOpts, scales: { ...commonOpts.scales,
+      y: { ...commonOpts.scales.y, position: 'left' },
+      y1: { ...commonOpts.scales.y, position: 'right', grid: { display: false } }
+    }}
+  });
+
+  powerChart = new Chart(document.getElementById('powerChart'), {
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label: 'Potência (mW)', data: [], borderColor: '#E8A33D', backgroundColor: 'rgba(232,163,61,0.12)', fill: true, tension: 0.3, pointRadius: 0 }
+    ]},
+    options: commonOpts
+  });
+
+  energyChart = new Chart(document.getElementById('energyChart'), {
+    type: 'line',
+    data: { labels: [], datasets: [
+      { label: 'Energia acumulada (Wh)', data: [], borderColor: '#57C4A0', backgroundColor: 'rgba(87,196,160,0.12)', fill: true, tension: 0.2, pointRadius: 0 }
+    ]},
+    options: commonOpts
+  });
+}
+
+function updateGauge(powerW, maxW) {
+  const arc = document.getElementById('gaugeArc');
+  const circumference = 282.6; // comprimento aproximado do arco (raio 90, meio círculo)
+  const ratio = Math.max(0, Math.min(1, powerW / maxW));
+  arc.setAttribute('stroke-dashoffset', String(circumference * (1 - ratio)));
+  document.getElementById('powerNow').textContent = powerW.toFixed(1);
+}
+
+function fmtTime(isoString) {
+  const d = new Date(isoString);
+  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+async function fetchAndRender(cfg) {
+  const keyParam = cfg.readKey ? `&api_key=${encodeURIComponent(cfg.readKey)}` : '';
+  const url = `https://api.thingspeak.com/channels/${encodeURIComponent(cfg.channelId)}/feeds.json?results=100${keyParam}`;
+
+  let data;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    data = await res.json();
+  } catch (e) {
+    setStatus('error', 'Não foi possível buscar dados do ThingSpeak');
+    return;
+  }
+
+  if (!data.feeds || data.feeds.length === 0) {
+    setStatus('error', 'Canal encontrado, mas ainda sem dados');
+    return;
+  }
+
+  setStatus('live', 'Conectado');
+
+  const feeds = data.feeds.filter(f => f.field1 !== null);
+  const labels = feeds.map(f => fmtTime(f.created_at));
+  const voltage = feeds.map(f => parseFloat(f.field1));
+  const current = feeds.map(f => parseFloat(f.field2));
+  const power = feeds.map(f => parseFloat(f.field3));
+  const energy = feeds.map(f => parseFloat(f.field4));
+
+  const last = feeds[feeds.length - 1];
+  document.getElementById('voltageNow').textContent = parseFloat(last.field1).toFixed(2);
+  document.getElementById('currentNow').textContent = parseFloat(last.field2).toFixed(1);
+  document.getElementById('energyNow').textContent = parseFloat(last.field4).toFixed(3);
+  document.getElementById('lastUpdated').textContent = fmtTime(last.created_at);
+
+  updateGauge(parseFloat(last.field3) / 1000, parseFloat(cfg.maxWatts) || 10);
+
+  vcChart.data.labels = labels;
+  vcChart.data.datasets[0].data = voltage;
+  vcChart.data.datasets[1].data = current;
+  vcChart.update();
+
+  powerChart.data.labels = labels;
+  powerChart.data.datasets[0].data = power;
+  powerChart.update();
+
+  energyChart.data.labels = labels;
+  energyChart.data.datasets[0].data = energy;
+  energyChart.update();
+}
+
+async function startDashboard(cfg) {
+  buildDashboardDOM();
+  initCharts();
+  els.configPanel.removeAttribute('open');
+  setStatus('', 'Conectando…');
+
+  if (pollTimer) clearInterval(pollTimer);
+  await fetchAndRender(cfg);
+  pollTimer = setInterval(() => fetchAndRender(cfg), 20000);
+}
+
+document.getElementById('saveConfig').addEventListener('click', async () => {
+  const cfg = {
+    channelId: els.channelId.value.trim(),
+    readKey: els.readKey.value.trim(),
+    maxWatts: els.maxWatts.value || '10'
+  };
+  if (!cfg.channelId) {
+    alert('Informe o Channel ID do seu canal ThingSpeak.');
+    return;
+  }
+  await saveConfig(cfg);
+  startDashboard(cfg);
+});
+
+(async function init() {
+  const cfg = await loadConfig();
+  if (cfg && cfg.channelId) {
+    els.channelId.value = cfg.channelId;
+    els.readKey.value = cfg.readKey || '';
+    els.maxWatts.value = cfg.maxWatts || '10';
+    startDashboard(cfg);
+  }
+})();
+</script>
+</body>
+</html>
