@@ -344,17 +344,17 @@ function setStatus(state, text) {
   els.statusText.textContent = text;
 }
 
-async function loadConfig() {
+function loadConfig() {
   try {
-    const res = await window.storage.get(STORAGE_KEY, false);
-    if (res && res.value) return JSON.parse(res.value);
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
   } catch (e) { /* nada salvo ainda */ }
   return null;
 }
 
-async function saveConfig(cfg) {
+function saveConfig(cfg) {
   try {
-    await window.storage.set(STORAGE_KEY, JSON.stringify(cfg), false);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cfg));
   } catch (e) {
     console.error('Falha ao salvar configuração', e);
   }
@@ -409,7 +409,7 @@ function initCharts() {
 
 function updateGauge(powerW, maxW) {
   const arc = document.getElementById('gaugeArc');
-  const circumference = 282.6; // comprimento aproximado do arco (raio 90, meio círculo)
+  const circumference = 282.6; // comprimento aproximado do arco
   const ratio = Math.max(0, Math.min(1, powerW / maxW));
   arc.setAttribute('stroke-dashoffset', String(circumference * (1 - ratio)));
   document.getElementById('powerNow').textContent = powerW.toFixed(1);
@@ -481,7 +481,7 @@ async function startDashboard(cfg) {
   pollTimer = setInterval(() => fetchAndRender(cfg), 20000);
 }
 
-document.getElementById('saveConfig').addEventListener('click', async () => {
+document.getElementById('saveConfig').addEventListener('click', () => {
   const cfg = {
     channelId: els.channelId.value.trim(),
     readKey: els.readKey.value.trim(),
@@ -491,12 +491,12 @@ document.getElementById('saveConfig').addEventListener('click', async () => {
     alert('Informe o Channel ID do seu canal ThingSpeak.');
     return;
   }
-  await saveConfig(cfg);
+  saveConfig(cfg);
   startDashboard(cfg);
 });
 
-(async function init() {
-  const cfg = await loadConfig();
+(function init() {
+  const cfg = loadConfig();
   if (cfg && cfg.channelId) {
     els.channelId.value = cfg.channelId;
     els.readKey.value = cfg.readKey || '';
